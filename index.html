@@ -2,7 +2,27 @@
 <html>
 <head>
   <title>BTC Stack Monitor</title>
-  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      background-color: #0d1117;
+      color: white;
+      font-family: monospace;
+      margin: 0;
+      padding: 20px;
+    }
+
+    #chatbox {
+      height: 350px;
+      border: 1px solid #30363d;
+      padding: 10px;
+      background: #010409;
+      overflow-y: auto;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+    }
+  </style>
 </head>
 <body>
 
@@ -12,8 +32,49 @@
   Waiting for data...
 </div>
 
-<!-- JavaScript to show live BTC stacks -->
-<script src="script.js"></script>
+<script>
+const chatbox = document.getElementById("chatbox");
+
+// Connect to Binance BTC/USDT order book
+const ws = new WebSocket("wss://stream.binance.com:9443/ws/btcusdt@depth@100ms");
+
+// Threshold for a "stack" (you can adjust this)
+const STACK_THRESHOLD = 50; // BTC size
+
+ws.onopen = () => {
+  chatbox.innerHTML = "Connected! Waiting for live data...";
+};
+
+ws.onerror = (err) => {
+  chatbox.innerHTML = "WebSocket error: " + err;
+};
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+
+  // Process buy orders (bids)
+  data.bids.forEach(([price, size]) => {
+    if (parseFloat(size) >= STACK_THRESHOLD) {
+      addMessage(`🟢 BUY STACK → $${price} (${size} BTC)`);
+    }
+  });
+
+  // Process sell orders (asks)
+  data.asks.forEach(([price, size]) => {
+    if (parseFloat(size) >= STACK_THRESHOLD) {
+      addMessage(`🔴 SELL STACK → $${price} (${size} BTC)`);
+    }
+  });
+};
+
+// Function to add messages at the top
+function addMessage(text) {
+  const msg = document.createElement("div");
+  const time = new Date().toLocaleTimeString();
+  msg.textContent = `[${time}] ${text}`;
+  chatbox.prepend(msg);
+}
+</script>
 
 </body>
 </html>
