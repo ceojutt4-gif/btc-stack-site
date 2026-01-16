@@ -29,7 +29,7 @@
 <h2>BTC Buy / Sell Stack Monitor</h2>
 
 <div id="chatbox">
-  Waiting for data...
+  Connecting to live data...
 </div>
 
 <script>
@@ -38,8 +38,17 @@ const chatbox = document.getElementById("chatbox");
 // Connect to Binance BTC/USDT order book
 const ws = new WebSocket("wss://stream.binance.com:9443/ws/btcusdt@depth@100ms");
 
-// Threshold for a "stack" (you can adjust this)
-const STACK_THRESHOLD = 50; // BTC size
+// Threshold for a "stack" in BTC
+const STACK_THRESHOLD = 10; // Lower to see more alerts
+
+// Cooldown map to prevent repeated alerts at same price
+const cooldown = {}; 
+const COOLDOWN_MS = 5000; // 5 seconds
+
+// Round prices to nearest 5 USD for grouping
+function roundPrice(price) {
+  return Math.round(price / 5) * 5;
+}
 
 ws.onopen = () => {
   chatbox.innerHTML = "Connected! Waiting for live data...";
@@ -54,15 +63,29 @@ ws.onmessage = (event) => {
 
   // Process buy orders (bids)
   data.bids.forEach(([price, size]) => {
-    if (parseFloat(size) >= STACK_THRESHOLD) {
-      addMessage(`🟢 BUY STACK → $${price} (${size} BTC)`);
+    const p = roundPrice(parseFloat(price));
+    const s = parseFloat(size);
+
+    if (s >= STACK_THRESHOLD) {
+      if (!cooldown[p]) {
+        addMessage(`🟢 BUY STACK → $${p} (${s.toFixed(2)} BTC)`);
+        cooldown[p] = true;
+        setTimeout(() => cooldown[p] = false, COOLDOWN_MS);
+      }
     }
   });
 
   // Process sell orders (asks)
   data.asks.forEach(([price, size]) => {
-    if (parseFloat(size) >= STACK_THRESHOLD) {
-      addMessage(`🔴 SELL STACK → $${price} (${size} BTC)`);
+    const p = roundPrice(parseFloat(price));
+    const s = parseFloat(size);
+
+    if (s >= STACK_THRESHOLD) {
+      if (!cooldown[p]) {
+        addMessage(`🔴 SELL STACK → $${p} (${s.toFixed(2)} BTC)`);
+        cooldown[p] = true;
+        setTimeout(() => cooldown[p] = false, COOLDOWN_MS);
+      }
     }
   });
 };
